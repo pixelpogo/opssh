@@ -1,0 +1,82 @@
+#!/usr/bin/env ruby
+
+$:.unshift(File.expand_path("../../lib", __FILE__))
+
+require 'optparse'
+require 'ostruct'
+require 'opssh'
+
+
+options = OpenStruct.new
+OptionParser.new do |opts|
+
+  opts.banner     = "Opssh"
+  opts.define_head  "SSH to your AWS OpsWorks instances easily"
+  opts.separator    ""
+  opts.separator    "Options:"
+
+  opts.on_tail("--help", "Show this message") do
+    puts opts
+    puts "\nSee #{Opssh::Config.config_file} for further configuration.\n\n"
+    exit
+  end
+
+  opts.on_tail("-v", "--version", "Show version") do
+    puts "Opssh #{Opssh::VERSION}"
+    exit
+  end
+
+  opts.on_tail("-n", "--no-cache", "Disable API caching"){ options.caching_enabled = false }
+
+  opts.on_tail("-c", "--clear-cache", "Clear OpsWorks API cache") do
+    Opssh::Api::reset_cache
+    options.cache_cleared = true
+  end
+
+  begin
+    opts.parse!
+  rescue OptionParser::ParseError
+    puts opts
+    exit 1
+  end
+
+end
+
+begin
+  stack, instance = nil
+
+  choice = Opssh::Choice.new
+  choice.caching_enabled = options.caching_enabled unless options.caching_enabled.nil?
+
+  system "clear"
+
+  puts "\n============================================================="
+  puts "\n         Opssh - ssh to your OpsWorks instances"
+  puts "\n=============================================================\n"
+
+  puts "\n\nOpsWorks API cache cleared..." if options.cache_cleared
+
+  puts "\n\n"
+  puts "\nAvailable OpsWorks stacks:"
+  puts "-----------------------------\n"
+  stack = choice.select_stack while stack.nil?
+
+  system "clear"
+  puts "\nYou chose stack #{stack[:name]}\n"
+
+  puts "\nAvailable Instances:"
+  puts "----------------------\n"
+  instance = choice.select_instance(stack[:id]) while instance.nil?
+
+  system "clear"
+  puts "\nYou chose instance #{instance[:name]}"
+
+  puts "Initializing SSH connection to #{instance[:public_dns]}..."
+  exec "#{Opssh::Config.ssh} #{instance[:public_dns]}"
+
+rescue Exception => e
+  puts e.message
+end
+
+
+
